@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galactic Defender - Space Shooter</title>
+    <!-- Tailwind CSS for styling UI overlays -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
+        
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #05050d;
+            color: #ffffff;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Glassmorphism styling */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            border-color: rgba(56, 189, 248, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(14, 165, 233, 0.25);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #38bdf8;
+            border-radius: 3px;
+        }
+
+        /* Glow animation */
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.8; filter: drop-shadow(0 0 15px rgba(56, 189, 248, 0.6)); }
+            50% { opacity: 1; filter: drop-shadow(0 0 25px rgba(56, 189, 248, 0.9)); }
+        }
+
+        .glow-effect {
+            animation: pulse-glow 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative bg-black overflow-hidden select-none">
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas" class="absolute inset-0 z-0 block w-full h-full"></canvas>
+
+    <!-- UI Layer -->
+    <div id="uiContainer" class="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-4 md:p-6">
+        
+        <!-- Top HUD (Score & Coins) -->
+        <div id="topHud" class="hidden justify-between items-start w-full max-w-7xl mx-auto">
+            <!-- Left Info / Active Powerup -->
+            <div class="flex flex-col gap-2">
+                <div class="glass-panel px-4 py-2 rounded-xl flex items-center gap-3 shadow-lg">
+                    <i class="fa-solid fa-shield-halved text-cyan-400 text-lg"></i>
+                    <div>
+                        <div class="text-xs text-slate-400 uppercase tracking-wider">Power-Up Active</div>
+                        <div id="activePowerupText" class="text-sm font-bold text-cyan-300 font-orbitron">Standard Laser</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Info (Score & HighScore & Coins) -->
+            <div class="flex flex-col items-end gap-2">
+                <div class="glass-panel px-5 py-2.5 rounded-xl flex items-center gap-6 shadow-xl border border-cyan-500/30">
+                    <div class="text-right">
+                        <div class="text-xs text-slate-400 uppercase tracking-widest">Score</div>
+                        <div id="scoreText" class="text-2xl font-black text-white font-orbitron tracking-wider">0</div>
+                    </div>
+                    <div class="w-px h-8 bg-slate-700/60"></div>
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-coins text-amber-400 text-xl animate-bounce"></i>
+                        <span id="coinText" class="text-2xl font-bold text-amber-300 font-orbitron">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom HUD (Permanent Skills) -->
+        <div id="bottomHud" class="hidden justify-center items-center gap-4 w-full pointer-events-auto pb-4">
+            <!-- Skill 1: Fast Shooter -->
+            <button id="skillFastBtn" onclick="activateSkill('fast')" class="group relative glass-panel p-3 rounded-2xl flex flex-col items-center gap-1 hover:border-cyan-400 transition-all active:scale-95">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xl shadow-lg shadow-cyan-500/30">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <span class="text-xs font-bold text-cyan-200 font-orbitron">FAST SHOOT</span>
+                <span class="text-[10px] text-slate-400">CD: 5s</span>
+                <!-- Cooldown Overlay -->
+                <div id="skillFastCD" class="absolute inset-0 bg-slate-950/80 rounded-2xl hidden flex-col items-center justify-center backdrop-blur-sm">
+                    <span id="skillFastTimer" class="text-lg font-bold text-cyan-400 font-orbitron">5</span>
+                </div>
+            </button>
+
+            <!-- Skill 2: Destroy All -->
+            <button id="skillNukeBtn" onclick="activateSkill('nuke')" class="group relative glass-panel p-3 rounded-2xl flex flex-col items-center gap-1 hover:border-red-400 transition-all active:scale-95">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-amber-600 flex items-center justify-center text-white text-xl shadow-lg shadow-red-500/30">
+                    <i class="fa-solid fa-burst"></i>
+                </div>
+                <span class="text-xs font-bold text-red-200 font-orbitron">DESTROY ALL</span>
+                <span class="text-[10px] text-slate-400">CD: 10s</span>
+                <!-- Cooldown Overlay -->
+                <div id="skillNukeCD" class="absolute inset-0 bg-slate-950/80 rounded-2xl hidden flex-col items-center justify-center backdrop-blur-sm">
+                    <span id="skillNukeTimer" class="text-lg font-bold text-red-400 font-orbitron">10</span>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- START MENU OVERLAY -->
+    <div id="startMenu" class="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="max-w-md w-full glass-panel p-8 rounded-3xl text-center border border-cyan-500/30 shadow-2xl relative overflow-hidden">
+            <!-- Decorative Glow -->
+            <div class="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="inline-block p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 mb-4 glow-effect">
+                <i class="fa-solid fa-rocket text-4xl text-cyan-400"></i>
+            </div>
+            
+            <h1 class="text-4xl md:text-5xl font-black font-orbitron tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-200 to-indigo-400 mb-2">
+                GALACTIC SHOOTER
+            </h1>
+            <p class="text-slate-400 text-sm mb-8">Hancurkan meteor, kumpulkan koin, dan tingkatkan armada tempurmu!</p>
+
+            <div class="flex items-center justify-center gap-6 mb-8 py-3 px-4 glass-card rounded-xl">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-amber-400"></i>
+                    <span class="text-xs text-slate-400">Highscore:</span>
+                    <span id="menuHighScore" class="font-bold font-orbitron text-white">0</span>
+                </div>
+                <div class="w-px h-5 bg-slate-700"></div>
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-coins text-amber-400"></i>
+                    <span class="text-xs text-slate-400">Koin:</span>
+                    <span id="menuCoins" class="font-bold font-orbitron text-amber-300">0</span>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <button onclick="startGame()" class="w-full py-4 rounded-xl font-orbitron font-bold text-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/30 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-play"></i> MAIN SEKARANG
+                </button>
+                <button onclick="openShop()" class="w-full py-3.5 rounded-xl font-orbitron font-bold text-md glass-card hover:bg-slate-800/80 text-cyan-300 border border-cyan-500/30 hover:border-cyan-400 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-store text-amber-400"></i> SHOP & GARASI
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SHOP MENU OVERLAY -->
+    <div id="shopMenu" class="absolute inset-0 z-30 hidden flex-col items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg">
+        <div class="max-w-3xl w-full h-[85vh] glass-panel p-6 md:p-8 rounded-3xl flex flex-col justify-between border border-cyan-500/30 shadow-2xl relative overflow-hidden">
+            
+            <!-- Header -->
+            <div class="flex justify-between items-center pb-4 border-b border-slate-800">
+                <div>
+                    <h2 class="text-2xl md:text-3xl font-black font-orbitron text-cyan-400 flex items-center gap-3">
+                        <i class="fa-solid fa-store text-amber-400"></i> HANGAR & SHOP
+                    </h2>
+                    <p class="text-xs text-slate-400">Pilih Skin Pesawat dan Efek Trail favoritmu</p>
+                </div>
+                <div class="flex items-center gap-2 glass-card px-4 py-2 rounded-xl border border-amber-500/30">
+                    <i class="fa-solid fa-coins text-amber-400 text-lg"></i>
+                    <span id="shopCoins" class="text-xl font-bold font-orbitron text-amber-300">0</span>
+                </div>
+            </div>
+
+            <!-- Content Area (Skins & Trail) -->
+            <div class="my-4 overflow-y-auto pr-2 flex-grow space-y-6">
+                <!-- Skins Section -->
+                <div>
+                    <h3 class="text-sm font-bold font-orbitron text-slate-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-jet-fighter text-cyan-400"></i> Skin Pesawat
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        
+                        <!-- Skin 1: Spade X -->
+                        <div class="glass-card p-4 rounded-2xl flex flex-col items-center text-center relative group">
+                            <div class="w-20 h-20 mb-3 flex items-center justify-center relative bg-slate-900/80 rounded-xl border border-slate-700">
+                                <canvas id="previewSpadeX" width="60" height="60"></canvas>
+                            </div>
+                            <h4 class="font-bold font-orbitron text-white text-md">Spade X</h4>
+                            <p class="text-[11px] text-slate-400 mb-3">Warna hitam elegan dengan motif polkadot putih.</p>
+                            <div class="mt-auto w-full">
+                                <div id="skinBtnSpadeX"></div>
+                            </div>
+                        </div>
+
+                        <!-- Skin 2: Phantom -->
+                        <div class="glass-card p-4 rounded-2xl flex flex-col items-center text-center relative group">
+                            <div class="w-20 h-20 mb-3 flex items-center justify-center relative bg-slate-900/80 rounded-xl border border-slate-700">
+                                <canvas id="previewPhantom" width="60" height="60"></canvas>
+                            </div>
+                            <h4 class="font-bold font-orbitron text-cyan-400 text-md">Phantom</h4>
+                            <p class="text-[11px] text-slate-400 mb-3">Pesawat tempur modern dengan aksen biru neon stealth.</p>
+                            <div class="mt-auto w-full">
+                                <div id="skinBtnPhantom"></div>
+                            </div>
+                        </div>
+
+                        <!-- Skin 3: Razor Destruction -->
+                        <div class="glass-card p-4 rounded-2xl flex flex-col items-center text-center relative group">
+                            <div class="w-20 h-20 mb-3 flex items-center justify-center relative bg-slate-900/80 rounded-xl border border-slate-700">
+                                <canvas id="previewRazor" width="60" height="60"></canvas>
+                            </div>
+                            <h4 class="font-bold font-orbitron text-red-400 text-md">Razor Destruction</h4>
+                            <p class="text-[11px] text-slate-400 mb-3">Jet tempur merah gahar bermotif kobaran api inferno.</p>
+                            <div class="mt-auto w-full">
+                                <div id="skinBtnRazor"></div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Trail Section -->
+                <div>
+                    <h3 class="text-sm font-bold font-orbitron text-slate-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-fire text-amber-400"></i> Efek Trail Pesawat
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        
+                        <!-- Trail 1: Soft Dusty -->
+                        <div class="glass-card p-4 rounded-2xl flex flex-col items-center text-center relative group">
+                            <div class="w-20 h-20 mb-3 flex items-center justify-center relative bg-slate-900/80 rounded-xl border border-slate-700">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-r from-red-500 to-amber-500 blur-sm shadow-lg shadow-orange-500/50"></div>
+                            </div>
+                            <h4 class="font-bold font-orbitron text-amber-400 text-md">Soft Dusty</h4>
+                            <p class="text-[11px] text-slate-400 mb-3">Jejak debu lembut merah-jingga yang membara.</p>
+                            <div class="mt-auto w-full">
+                                <div id="trailBtnSoftDusty"></div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="pt-4 border-t border-slate-800 flex justify-end">
+                <button onclick="closeShop()" class="px-6 py-2.5 rounded-xl font-orbitron font-bold text-sm bg-slate-800 hover:bg-slate-700 text-white transition-all">
+                    KEMBALI KE MENU
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- GAME OVER OVERLAY -->
+    <div id="gameOverMenu" class="absolute inset-0 z-30 hidden flex-col items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+        <div class="max-w-md w-full glass-panel p-8 rounded-3xl text-center border border-red-500/30 shadow-2xl relative overflow-hidden">
+            <div class="inline-block p-3 rounded-2xl bg-red-500/10 border border-red-500/30 mb-4">
+                <i class="fa-solid fa-skull text-4xl text-red-500 animate-pulse"></i>
+            </div>
+            
+            <h2 class="text-4xl font-black font-orbitron text-red-500 mb-2">GAME OVER</h2>
+            <p class="text-slate-400 text-sm mb-6">Pesawatmu hancur berkeping-keping di angkasa!</p>
+
+            <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 mb-6 space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400 text-sm">Skor Akhir</span>
+                    <span id="finalScore" class="text-2xl font-bold font-orbitron text-white">0</span>
+                </div>
+                <div class="w-full h-px bg-slate-800"></div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400 text-sm">High Score</span>
+                    <span id="finalHighScore" class="text-xl font-bold font-orbitron text-amber-400">0</span>
+                </div>
+                <div class="w-full h-px bg-slate-800"></div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400 text-sm">Koin Didapat</span>
+                    <span id="finalCoins" class="text-xl font-bold font-orbitron text-amber-300 flex items-center gap-1">
+                        +<span id="coinsEarnedThisRun">0</span> <i class="fa-solid fa-coins text-xs"></i>
+                    </span>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <button onclick="startGame()" class="w-full py-3.5 rounded-xl font-orbitron font-bold text-md bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-lg shadow-red-500/30 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i> ULANGI
+                </button>
+                <button onclick="backToMenu()" class="w-full py-3 rounded-xl font-orbitron font-bold text-sm glass-card hover:bg-slate-800 text-slate-300 border border-slate-700 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-house"></i> BACK TO MENU
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game State Variables
+        let canvas, ctx;
+        let gameState = 'MENU'; // 'MENU', 'PLAYING', 'GAMEOVER'
+        let score = 0;
+        let coins = parseInt(localStorage.getItem('space_shooter_coins') || '0');
+        let highScore = parseInt(localStorage.getItem('space_shooter_highscore') || '0');
+        let coinsEarnedRun = 0;
+
+        // Inventory & Equipment Storage
+        let inventory = JSON.parse(localStorage.getItem('space_shooter_inventory') || JSON.stringify({
+            skins: ['default'],
+            equippedSkin: 'default',
+            trails: [],
+            equippedTrail: 'none'
+        }));
+
+        // Shop Prices & Config
+        const SHOP_ITEMS = {
+            skins: {
+                spadeX: { name: 'Spade X', price: 100 },
+                phantom: { name: 'Phantom', price: 300 },
+                razor: { name: 'Razor Destruction', price: 500 }
+            },
+            trails: {
+                softDusty: { name: 'Soft Dusty', price: 125 }
+            }
+        };
+
+        // Entities arrays
+        let player;
+        let bullets = [];
+        let meteors = [];
+        let powerups = [];
+        let particles = [];
+        let stars = [];
+
+        // Input Handling
+        let mouseX = 0, mouseY = 0;
+        let keys = {};
+
+        // Active Skills State
+        let skillFastCD = 0;
+        let skillNukeCD = 0;
+        let fastShooterActive = false;
+        let fastShooterTimer = 0;
+
+        // Audio System Synthesizer (Web Audio API)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+                if (type === 'shoot') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'explosion') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'coin') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.setValueAtTime(1200, now + 0.08);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else if (type === 'powerup') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.linearRampToValueAtTime(800, now + 0.25);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'bomb') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(80, now);
+                    osc.frequency.exponentialRampToValueAtTime(20, now + 0.6);
+                    gain.gain.setValueAtTime(0.5, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.6);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                }
+            } catch(e){}
+        }
+
+        window.onload = () => {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            resizeCanvas();
+
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Mouse & Touch Movement
+            window.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            window.addEventListener('touchmove', (e) => {
+                if (e.touches.length > 0) {
+                    mouseX = e.touches[0].clientX;
+                    mouseY = e.touches[0].clientY;
+                }
+            }, { passive: true });
+
+            window.addEventListener('keydown', (e) => {
+                keys[e.key] = true;
+                if (e.key === '1') activateSkill('fast');
+                if (e.key === '2') activateSkill('nuke');
+            });
+            window.addEventListener('keyup', (e) => keys[e.key] = false);
+
+            initBackgroundStars();
+            updateMenuUI();
+            renderPreviews();
+            
+            // Main animation loop start
+            requestAnimationFrame(gameLoop);
+        };
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if (player) {
+                player.x = Math.min(player.x, canvas.width);
+                player.y = Math.min(player.y, canvas.height);
+            }
+        }
+
+        function saveStorage() {
+            localStorage.setItem('space_shooter_coins', coins.toString());
+            localStorage.setItem('space_shooter_highscore', highScore.toString());
+            localStorage.setItem('space_shooter_inventory', JSON.stringify(inventory));
+        }
+
+        function updateMenuUI() {
+            document.getElementById('menuHighScore').innerText = highScore;
+            document.getElementById('menuCoins').innerText = coins;
+            document.getElementById('shopCoins').innerText = coins;
+            document.getElementById('coinText').innerText = coins;
+        }
+
+        class Player {
+            constructor() {
+                this.x = canvas.width / 2;
+                this.y = canvas.height - 100;
+                this.radius = 24;
+                this.speed = 8;
+                this.shootCooldown = 0;
+                this.powerup = 'normal'; // 'normal', 'double', 'triple', 'bomb'
+                this.powerupTimer = 0;
+            }
+
+            update(dt) {
+                // Movement via Mouse / Touch direct tracking or Smooth Key Movement
+                if (keys['ArrowLeft'] || keys['a'] || keys['A']) this.x -= this.speed;
+                if (keys['ArrowRight'] || keys['d'] || keys['D']) this.x += this.speed;
+                if (keys['ArrowUp'] || keys['w'] || keys['W']) this.y -= this.speed;
+                if (keys['ArrowDown'] || keys['s'] || keys['S']) this.y += this.speed;
+
+                // Mouse follow smoothing if mouse is active
+                if (mouseX > 0 && mouseY > 0) {
+                    const dx = mouseX - this.x;
+                    const dy = mouseY - this.y;
+                    this.x += dx * 0.15;
+                    this.y += dy * 0.15;
+                }
+
+                // Bounds constraint
+                this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
+
+                // Powerup Timer Management
+                if (this.powerupTimer > 0) {
+                    this.powerupTimer -= dt;
+                    if (this.powerupTimer <= 0) {
+                        this.powerup = 'normal';
+                        document.getElementById('activePowerupText').innerText = "Standard Laser";
+                    }
+                }
+
+                // Shooting Logic
+                this.shootCooldown -= dt;
+                let currentInterval = fastShooterActive ? 0.08 : 0.16;
+
+                if (this.shootCooldown <= 0) {
+                    this.shoot();
+                    this.shootCooldown = currentInterval;
+                }
+
+                // Spawn Soft Dusty Trail particles
+                if (inventory.equippedTrail === 'softDusty') {
+                    particles.push(new Particle(
+                        this.x + (Math.random() - 0.5) * 12,
+                        this.y + 20,
+                        (Math.random() - 0.5) * 1,
+                        Math.random() * 2 + 2,
+                        Math.random() * 8 + 6,
+                        '#f97316',
+                        0.6
+                    ));
+                }
+            }
+
+            shoot() {
+                playSound('shoot');
+                if (this.powerup === 'normal') {
+                    bullets.push(new Bullet(this.x, this.y - 20, 0, -14));
+                } else if (this.powerup === 'double') {
+                    bullets.push(new Bullet(this.x - 12, this.y - 15, 0, -14));
+                    bullets.push(new Bullet(this.x + 12, this.y - 15, 0, -14));
+                } else if (this.powerup === 'triple') {
+                    bullets.push(new Bullet(this.x, this.y - 20, 0, -14));
+                    bullets.push(new Bullet(this.x - 12, this.y - 15, -3, -13));
+                    bullets.push(new Bullet(this.x + 12, this.y - 15, 3, -13));
+                } else if (this.powerup === 'bomb') {
+                    bullets.push(new Bullet(this.x, this.y - 20, 0, -10, true));
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                const skin = inventory.equippedSkin;
+                if (skin === 'spadeX') {
+                    drawSpadeXSkin(ctx);
+                } else if (skin === 'phantom') {
+                    drawPhantomSkin(ctx);
+                } else if (skin === 'razor') {
+                    drawRazorSkin(ctx);
+                } else {
+                    drawDefaultSkin(ctx);
+                }
+
+                ctx.restore();
+            }
+        }
+
+        function drawDefaultSkin(c) {
+            c.fillStyle = '#38bdf8';
+            c.beginPath();
+            c.moveTo(0, -25);
+            c.lineTo(20, 20);
+            c.lineTo(0, 12);
+            c.lineTo(-20, 20);
+            c.closePath();
+            c.fill();
+
+            c.fillStyle = '#e0f2fe';
+            c.beginPath();
+            c.arc(0, -5, 6, 0, Math.PI * 2);
+            c.fill();
+        }
+
+        function drawSpadeXSkin(c) {
+            // Black body with white polka dots
+            c.fillStyle = '#0f172a';
+            c.strokeStyle = '#ffffff';
+            c.lineWidth = 2;
+
+            c.beginPath();
+            c.moveTo(0, -28);
+            c.lineTo(24, 18);
+            c.lineTo(10, 12);
+            c.lineTo(0, 22);
+            c.lineTo(-10, 12);
+            c.lineTo(-24, 18);
+            c.closePath();
+            c.fill();
+            c.stroke();
+
+            // White Polka Dots
+            c.fillStyle = '#ffffff';
+            const dots = [{x:0, y:-10}, {x:-8, y:2}, {x:8, y:2}, {x:-14, y:12}, {x:14, y:12}, {x:0, y:8}];
+            dots.forEach(d => {
+                c.beginPath();
+                c.arc(d.x, d.y, 2.5, 0, Math.PI * 2);
+                c.fill();
+            });
+        }
+
+        function drawPhantomSkin(c) {
+            // Sleek Neon Blue Modern Jet
+            c.shadowColor = '#06b6d4';
+            c.shadowBlur = 12;
+            c.fillStyle = '#0284c7';
+            c.strokeStyle = '#22d3ee';
+            c.lineWidth = 2;
+
+            c.beginPath();
+            c.moveTo(0, -30);
+            c.lineTo(8, -10);
+            c.lineTo(26, 15);
+            c.lineTo(12, 12);
+            c.lineTo(0, 24);
+            c.lineTo(-12, 12);
+            c.lineTo(-26, 15);
+            c.lineTo(-8, -10);
+            c.closePath();
+            c.fill();
+            c.stroke();
+
+            // Cockpit Glow
+            c.fillStyle = '#a5f3fc';
+            c.beginPath();
+            c.ellipse(0, -8, 4, 10, 0, 0, Math.PI * 2);
+            c.fill();
+            c.shadowBlur = 0;
+        }
+
+        function drawRazorSkin(c) {
+            // Inferno Red Jagged Jet
+            c.shadowColor = '#ef4444';
+            c.shadowBlur = 15;
+            
+            // Flame gradient
+            let grad = c.createLinearGradient(0, -30, 0, 25);
+            grad.addColorStop(0, '#fef08a');
+            grad.addColorStop(0.5, '#f97316');
+            grad.addColorStop(1, '#dc2626');
+
+            c.fillStyle = grad;
+            c.strokeStyle = '#fca5a5';
+            c.lineWidth = 1.5;
+
+            c.beginPath();
+            c.moveTo(0, -32);
+            c.lineTo(6, -15);
+            c.lineTo(28, 18);
+            c.lineTo(14, 10);
+            c.lineTo(18, 26);
+            c.lineTo(0, 18);
+            c.lineTo(-18, 26);
+            c.lineTo(-14, 10);
+            c.lineTo(-28, 18);
+            c.lineTo(-6, -15);
+            c.closePath();
+            c.fill();
+            c.stroke();
+            c.shadowBlur = 0;
+        }
+
+        class Bullet {
+            constructor(x, y, vx, vy, isBomb = false) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.radius = isBomb ? 10 : 4;
+                this.isBomb = isBomb;
+                this.active = true;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.y < -20 || this.x < -20 || this.x > canvas.width + 20) {
+                    this.active = false;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                if (this.isBomb) {
+                    ctx.shadowColor = '#f59e0b';
+                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, vx, vy, radius, color, alpha = 1) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.radius = radius;
+                this.color = color;
+                this.alpha = alpha;
+                this.decay = 0.02 + Math.random() * 0.02;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Meteor {
+            constructor(x, y, sizeIndex, vx = null, vy = null) {
+                this.x = x;
+                this.y = y;
+                this.sizeIndex = sizeIndex; // 1: Very Small, 2: Small, 3: Medium, 4: Large, 5: Very Large
+
+                // Properties based on size (HP disesuaikan: 1, 1, 2, 3, 3)
+                const configs = {
+                    1: { radius: 12, hp: 1, coins: 1, speed: 4.5 },
+                    2: { radius: 20, hp: 1, coins: 2, speed: 3.5 },
+                    3: { radius: 30, hp: 2, coins: 3, speed: 2.5 },
+                    4: { radius: 42, hp: 3, coins: 4, speed: 2.0 },
+                    5: { radius: 58, hp: 3, coins: 5, speed: 1.4 }
+                };
+
+                const cfg = configs[sizeIndex];
+                this.radius = cfg.radius;
+                this.hp = cfg.hp;
+                this.maxHp = cfg.hp;
+                this.coins = cfg.coins;
+                this.vx = vx !== null ? vx : (Math.random() - 0.5) * 1.5;
+                this.vy = vy !== null ? vy : Math.random() * 1.2 + cfg.speed;
+                
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotSpeed = (Math.random() - 0.5) * 0.04;
+                this.active = true;
+
+                // Irregular polygon vertex generation
+                this.vertices = [];
+                const numVerts = 8 + Math.floor(Math.random() * 4);
+                for (let i = 0; i < numVerts; i++) {
+                    const angle = (i / numVerts) * Math.PI * 2;
+                    const offset = (Math.random() * 0.4 + 0.8) * this.radius;
+                    this.vertices.push({
+                        x: Math.cos(angle) * offset,
+                        y: Math.sin(angle) * offset
+                    });
+                }
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.rotation += this.rotSpeed;
+
+                if (this.y > canvas.height + this.radius || this.x < -100 || this.x > canvas.width + 100) {
+                    this.active = false;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+
+                ctx.fillStyle = '#475569';
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                ctx.moveTo(this.vertices[0].x, this.vertices[0].y);
+                for (let i = 1; i < this.vertices.length; i++) {
+                    ctx.lineTo(this.vertices[i].x, this.vertices[i].y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            takeDamage(damage) {
+                this.hp -= damage;
+                if (this.hp <= 0 && this.active) {
+                    this.destroy();
+                }
+            }
+
+            destroy() {
+                this.active = false;
+                score += this.coins * 100;
+                coins += this.coins;
+                coinsEarnedRun += this.coins;
+                updateMenuUI();
+
+                playSound('explosion');
+
+                // Spawn explosion particles
+                for (let i = 0; i < this.radius / 2; i++) {
+                    particles.push(new Particle(
+                        this.x, this.y,
+                        (Math.random() - 0.5) * 6,
+                        (Math.random() - 0.5) * 6,
+                        Math.random() * 4 + 2,
+                        '#94a3b8'
+                    ));
+                }
+
+                // Special rule: Very Large (size 5) splits into 5 Very Small (size 1) meteors!
+                if (this.sizeIndex === 5) {
+                    for (let i = 0; i < 5; i++) {
+                        const angle = (i / 5) * Math.PI * 2;
+                        const vx = Math.cos(angle) * 3;
+                        const vy = Math.sin(angle) * 3 + 1;
+                        meteors.push(new Meteor(this.x, this.y, 1, vx, vy));
+                    }
+                }
+
+                // Random Powerup drop chance (~15%)
+                if (Math.random() < 0.15) {
+                    const types = ['double', 'triple', 'bomb'];
+                    const picked = types[Math.floor(Math.random() * types.length)];
+                    powerups.push(new PowerUp(this.x, this.y, picked));
+                }
+            }
+        }
+
+        class PowerUp {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'double', 'triple', 'bomb'
+                this.radius = 16;
+                this.vy = 2;
+                this.active = true;
+            }
+
+            update() {
+                this.y += this.vy;
+                if (this.y > canvas.height + 30) this.active = false;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                let color = '#38bdf8';
+                let icon = '2X';
+                if (this.type === 'triple') { color = '#a855f7'; icon = '3X'; }
+                if (this.type === 'bomb') { color = '#f59e0b'; icon = '💣'; }
+
+                ctx.fillStyle = color;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Orbitron';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(icon, 0, 0);
+
+                ctx.restore();
+            }
+        }
+
+        function initBackgroundStars() {
+            stars = [];
+            for (let i = 0; i < 120; i++) {
+                stars.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    size: Math.random() * 2 + 0.5,
+                    speed: Math.random() * 1.5 + 0.5
+                });
+            }
+        }
+
+        function updateStars() {
+            stars.forEach(s => {
+                s.y += s.speed;
+                if (s.y > canvas.height) {
+                    s.y = 0;
+                    s.x = Math.random() * canvas.width;
+                }
+            });
+        }
+
+        function drawStars() {
+            ctx.fillStyle = '#ffffff';
+            stars.forEach(s => {
+                ctx.globalAlpha = Math.random() * 0.5 + 0.5;
+                ctx.fillRect(s.x, s.y, s.size, s.size);
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        function activateSkill(type) {
+            if (gameState !== 'PLAYING') return;
+
+            if (type === 'fast' && skillFastCD <= 0) {
+                fastShooterActive = true;
+                fastShooterTimer = 4; // lasts 4 sec
+                skillFastCD = 5; // 5s cooldown
+                playSound('powerup');
+                
+                document.getElementById('skillFastCD').classList.remove('hidden');
+                document.getElementById('skillFastCD').classList.add('flex');
+            } else if (type === 'nuke' && skillNukeCD <= 0) {
+                skillNukeCD = 10; // 10s cooldown
+                playSound('bomb');
+
+                // Destroy all active meteors on screen!
+                meteors.forEach(m => m.destroy());
+                meteors = [];
+
+                // Flash screen effect
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                document.getElementById('skillNukeCD').classList.remove('hidden');
+                document.getElementById('skillNukeCD').classList.add('flex');
+            }
+        }
+
+        function updateSkillTimers(dt) {
+            // Fast shooter active timer
+            if (fastShooterActive) {
+                fastShooterTimer -= dt;
+                if (fastShooterTimer <= 0) {
+                    fastShooterActive = false;
+                }
+            }
+
+            // Cooldown 1: Fast Shooter
+            if (skillFastCD > 0) {
+                skillFastCD -= dt;
+                document.getElementById('skillFastTimer').innerText = Math.ceil(skillFastCD);
+                if (skillFastCD <= 0) {
+                    skillFastCD = 0;
+                    document.getElementById('skillFastCD').classList.add('hidden');
+                    document.getElementById('skillFastCD').classList.remove('flex');
+                }
+            }
+
+            // Cooldown 2: Destroy All
+            if (skillNukeCD > 0) {
+                skillNukeCD -= dt;
+                document.getElementById('skillNukeTimer').innerText = Math.ceil(skillNukeCD);
+                if (skillNukeCD <= 0) {
+                    skillNukeCD = 0;
+                    document.getElementById('skillNukeCD').classList.add('hidden');
+                    document.getElementById('skillNukeCD').classList.remove('flex');
+                }
+            }
+        }
+
+        let lastTime = performance.now();
+        let meteorSpawnTimer = 0;
+
+        function startGame() {
+            gameState = 'PLAYING';
+            score = 0;
+            coinsEarnedRun = 0;
+            bullets = [];
+            meteors = [];
+            powerups = [];
+            particles = [];
+            skillFastCD = 0;
+            skillNukeCD = 0;
+            fastShooterActive = false;
+
+            player = new Player();
+
+            document.getElementById('startMenu').classList.add('hidden');
+            document.getElementById('shopMenu').classList.add('hidden');
+            document.getElementById('gameOverMenu').classList.add('hidden');
+            document.getElementById('topHud').classList.remove('hidden');
+            document.getElementById('topHud').classList.add('flex');
+            document.getElementById('bottomHud').classList.remove('hidden');
+            document.getElementById('bottomHud').classList.add('flex');
+
+            document.getElementById('activePowerupText').innerText = "Standard Laser";
+            updateMenuUI();
+        }
+
+        function gameLoop(now) {
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            updateStars();
+            drawStars();
+
+            if (gameState === 'PLAYING') {
+                updateSkillTimers(dt);
+
+                // Meteor Spawning Logic
+                meteorSpawnTimer -= dt;
+                if (meteorSpawnTimer <= 0) {
+                    meteorSpawnTimer = Math.max(0.4, 1.8 - (score / 10000));
+                    
+                    // Pick random size 1 to 5
+                    const sizeIndex = Math.floor(Math.random() * 5) + 1;
+                    const spawnX = Math.random() * (canvas.width - 80) + 40;
+                    meteors.push(new Meteor(spawnX, -60, sizeIndex));
+                }
+
+                // Update Player
+                player.update(dt);
+                player.draw();
+
+                // Update Bullets
+                bullets.forEach(b => b.update());
+                bullets = bullets.filter(b => b.active);
+                bullets.forEach(b => b.draw());
+
+                // Update Meteors
+                meteors.forEach(m => m.update());
+                meteors = meteors.filter(m => m.active);
+                meteors.forEach(m => m.draw());
+
+                // Update Powerups
+                powerups.forEach(p => p.update());
+                powerups = powerups.filter(p => p.active);
+                powerups.forEach(p => p.draw());
+
+                // Update Particles
+                particles.forEach(pt => pt.update());
+                particles = particles.filter(pt => pt.alpha > 0);
+                particles.forEach(pt => pt.draw());
+
+                // Collisions Checking
+                checkCollisions();
+
+                // Score Display Update
+                document.getElementById('scoreText').innerText = score;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function checkCollisions() {
+            // 1. Bullets vs Meteors
+            bullets.forEach(b => {
+                meteors.forEach(m => {
+                    if (!b.active || !m.active) return;
+                    const dist = Math.hypot(b.x - m.x, b.y - m.y);
+                    if (dist < b.radius + m.radius) {
+                        b.active = false;
+
+                        if (b.isBomb) {
+                            // Bomb AoE Explosion!
+                            playSound('bomb');
+                            for (let i = 0; i < 30; i++) {
+                                particles.push(new Particle(b.x, b.y, (Math.random()-0.5)*12, (Math.random()-0.5)*12, Math.random()*6+2, '#f59e0b'));
+                            }
+                            // Damage surrounding meteors
+                            meteors.forEach(nearM => {
+                                if (Math.hypot(b.x - nearM.x, b.y - nearM.y) < 130) {
+                                    nearM.takeDamage(10);
+                                }
+                            });
+                        } else {
+                            m.takeDamage(1);
+                        }
+                    }
+                });
+            });
+
+            // 2. Player vs Powerups
+            powerups.forEach(p => {
+                if (!p.active) return;
+                const dist = Math.hypot(player.x - p.x, player.y - p.y);
+                if (dist < player.radius + p.radius) {
+                    p.active = false;
+                    player.powerup = p.type;
+                    player.powerupTimer = 8; // 8 seconds duration
+                    playSound('powerup');
+
+                    const names = { double: "Double Laser", triple: "Triple Laser", bomb: "Bomb Shooter" };
+                    document.getElementById('activePowerupText').innerText = names[p.type];
+                }
+            });
+
+            // 3. Player vs Meteors (Game Over)
+            meteors.forEach(m => {
+                if (!m.active) return;
+                const dist = Math.hypot(player.x - m.x, player.y - m.y);
+                if (dist < player.radius + m.radius * 0.75) {
+                    triggerGameOver();
+                }
+            });
+        }
+
+        function triggerGameOver() {
+            gameState = 'GAMEOVER';
+            playSound('explosion');
+
+            if (score > highScore) {
+                highScore = score;
+            }
+            saveStorage();
+
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('finalHighScore').innerText = highScore;
+            document.getElementById('coinsEarnedThisRun').innerText = coinsEarnedRun;
+
+            document.getElementById('topHud').classList.add('hidden');
+            document.getElementById('bottomHud').classList.add('hidden');
+            document.getElementById('gameOverMenu').classList.remove('hidden');
+            document.getElementById('gameOverMenu').classList.add('flex');
+        }
+
+        function backToMenu() {
+            gameState = 'MENU';
+            document.getElementById('gameOverMenu').classList.add('hidden');
+            document.getElementById('shopMenu').classList.add('hidden');
+            document.getElementById('startMenu').classList.remove('hidden');
+            updateMenuUI();
+        }
+
+        function openShop() {
+            document.getElementById('startMenu').classList.add('hidden');
+            document.getElementById('shopMenu').classList.remove('hidden');
+            document.getElementById('shopMenu').classList.add('flex');
+            updateShopUI();
+        }
+
+        function closeShop() {
+            document.getElementById('shopMenu').classList.add('hidden');
+            document.getElementById('startMenu').classList.remove('hidden');
+            updateMenuUI();
+        }
+
+        function updateShopUI() {
+            document.getElementById('shopCoins').innerText = coins;
+
+            // Render Spade X Skin Button
+            renderShopItemBtn('skinBtnSpadeX', 'spadeX', 'skin', SHOP_ITEMS.skins.spadeX.price);
+            renderShopItemBtn('skinBtnPhantom', 'phantom', 'skin', SHOP_ITEMS.skins.phantom.price);
+            renderShopItemBtn('skinBtnRazor', 'razor', 'skin', SHOP_ITEMS.skins.razor.price);
+
+            // Render Soft Dusty Trail Button
+            renderShopItemBtn('trailBtnSoftDusty', 'softDusty', 'trail', SHOP_ITEMS.trails.softDusty.price);
+        }
+
+        function renderShopItemBtn(containerId, itemId, category, price) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const isUnlocked = category === 'skin' ? inventory.skins.includes(itemId) : inventory.trails.includes(itemId);
+            const isEquipped = category === 'skin' ? inventory.equippedSkin === itemId : inventory.equippedTrail === itemId;
+
+            if (isEquipped) {
+                container.innerHTML = `<button disabled class="w-full py-2 rounded-xl bg-cyan-500/20 text-cyan-300 font-orbitron font-bold text-xs border border-cyan-500/50">TERPASANG</button>`;
+            } else if (isUnlocked) {
+                container.innerHTML = `<button onclick="equipItem('${itemId}', '${category}')" class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-orbitron font-bold text-xs transition-all">GUNAKAN</button>`;
+            } else {
+                const canAfford = coins >= price;
+                container.innerHTML = `
+                    <button onclick="buyItem('${itemId}', '${category}', ${price})" ${!canAfford ? 'disabled' : ''} class="w-full py-2 rounded-xl ${canAfford ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white' : 'bg-slate-800 text-slate-500'} font-orbitron font-bold text-xs transition-all flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-coins text-xs"></i> ${price} KOIN
+                    </button>
+                `;
+            }
+        }
+
+        function buyItem(itemId, category, price) {
+            if (coins >= price) {
+                coins -= price;
+                if (category === 'skin') {
+                    inventory.skins.push(itemId);
+                    inventory.equippedSkin = itemId;
+                } else {
+                    inventory.trails.push(itemId);
+                    inventory.equippedTrail = itemId;
+                }
+                playSound('coin');
+                saveStorage();
+                updateShopUI();
+            }
+        }
+
+        function equipItem(itemId, category) {
+            if (category === 'skin') {
+                inventory.equippedSkin = itemId;
+            } else {
+                inventory.equippedTrail = itemId;
+            }
+            playSound('powerup');
+            saveStorage();
+            updateShopUI();
+        }
+
+        // Render Canvas Previews in Shop
+        function renderPreviews() {
+            // Spade X Preview
+            const cSpade = document.getElementById('previewSpadeX').getContext('2d');
+            cSpade.save(); cSpade.translate(30, 30); drawSpadeXSkin(cSpade); cSpade.restore();
+
+            // Phantom Preview
+            const cPhantom = document.getElementById('previewPhantom').getContext('2d');
+            cPhantom.save(); cPhantom.translate(30, 30); drawPhantomSkin(cPhantom); cPhantom.restore();
+
+            // Razor Preview
+            const cRazor = document.getElementById('previewRazor').getContext('2d');
+            cRazor.save(); cRazor.translate(30, 30); drawRazorSkin(cRazor); cRazor.restore();
+        }
+    </script>
+</body>
+</html>
